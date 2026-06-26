@@ -1,0 +1,53 @@
+name: Informatica Daily Pipeline
+
+on:
+  schedule:
+    - cron: '30 6 * * *'  # Runs every day at 6:30 AM UTC (12:00 AM PDT)
+  workflow_dispatch:        # Allows manual trigger from GitHub UI anytime
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    env:
+      IICS_USERNAME: ${{ secrets.IICS_USERNAME }}
+      IICS_PASSWORD: ${{ secrets.IICS_PASSWORD }}
+      IICS_POD_URL: ${{ secrets.IICS_POD_URL }}
+      REDSHIFT_HOST: ${{ secrets.REDSHIFT_HOST }}
+      REDSHIFT_PORT: ${{ secrets.REDSHIFT_PORT }}
+      REDSHIFT_DB: ${{ secrets.REDSHIFT_DB }}
+      REDSHIFT_USER: ${{ secrets.REDSHIFT_USER }}
+      REDSHIFT_PASSWORD: ${{ secrets.REDSHIFT_PASSWORD }}
+
+    steps:
+
+      # Step 1: Download your repo files onto GitHub's machine
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Step 3: Install libraries from requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Step 4: Run mapping_task_stats.py (fetches from Informatica, saves CSV to output/)
+      - name: Fetch Informatica stats
+        run: python mapping_task_stats.py
+
+      # Step 5: Run load_to_redshift.py (reads CSV from output/, loads to Redshift, moves to archive/)
+      - name: Load to Redshift
+        run: python load_to_redshift.py
+
+      # Step 6: Push archive/ folder back to GitHub repo so you can see all CSVs
+      - name: Push archive to GitHub
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add archive/
+          git diff --staged --quiet || git commit -m "archive: $(date +'%Y-%m-%d') run"
+          git push
