@@ -136,6 +136,14 @@ def insert_to_redshift(records: list[tuple], redshift_config: dict) -> None:
         print("✅ Connected!")
         cur = conn.cursor()
 
+        stat_date = records[0][0]  
+        print(f"🗑️ Deleting existing rows for {stat_date}...")
+        cur.execute(
+            "DELETE FROM powerbipoc.fact_mapping_execution WHERE stat_date = %s",
+            (stat_date,)
+        )
+        print(f"✅ Old rows deleted!")
+
         total = len(records)
         inserted = 0
 
